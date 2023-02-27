@@ -1,82 +1,65 @@
- // SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MyToken is ERC20, Ownable {
-    uint256 private _totalSupply;
-    uint256 private _taxFee;
-    uint256 private _burnAmount;
-   
-    uint256 private _oneEtherInTokens;
-    uint256 public minInvestment = 10**17; // minimum investment is 0.1 ether
-    uint256 public maxInvestment = 2 ether; // maximum investment is 2 ether
-    mapping (address => bool) private _exemptAccounts;
-   
-    event Burn(address indexed burner, uint256 amount);
-    event TaxFeeUpdated(uint256 taxFee);
-
-    constructor() ERC20("MyToken", "TK") {
-        _totalSupply = 200000000 * (10 ** uint256(decimals()));
-        _oneEtherInTokens = 10000000 * (10 ** uint256(decimals()));
-        _taxFee = 10; // 10% tax fee
-        _exemptAccounts[msg.sender] = true; // owner address is exempted
-      //  _mint(msg.sender, _totalSupply);
-       
-    }
+contract Tokens is ERC20 {
+    uint256 public amount;
+    address Owner;
+    uint256 taxPercentage;
     
+    constructor(uint256 _amount) ERC20("TokenTest", "Test") {
+        amount = _amount;
+        Owner = msg.sender;
+        taxPercentage = 10; 
+    }
 
+    modifier onlyOwner {
+        require(msg.sender == Owner, "Access to only Owner");
+        _;
+    }
 
-    function transfer(address to, uint256 value) public override returns (bool) {
-        uint256 taxAmount = calculateTaxFee(value);
-        uint256 netValue = value - taxAmount;
-        _transfer(msg.sender, to, netValue);
-        if (taxAmount > 0) {
-            _transfer(msg.sender, address(this), taxAmount);
-            emit Transfer(msg.sender, address(this), taxAmount);
-        }
+    mapping(address => bool) exemptedAccounts;
+    mapping(address => uint256) spent;
+
+    function setExemptedAccount(address acc) public onlyOwner {
+        exemptedAccounts[acc] = true;
+    }
+
+    function mint() public payable returns(bool) {
+        require(msg.value >= 0.1 ether, "Investment amount is low");
+        require(msg.value <= 2 ether, "Investement amount is too high");
+        
+        uint256 mintAmount = (msg.value * 10000000);
+        
+        require((totalSupply() + mintAmount) <= amount, "investment amount should be less then total mount");
+        require(spent[msg.sender] + msg.value <= 2 ether, "Max limit reached");
+
+        _mint(msg.sender, mintAmount);
+        spent[msg.sender] += msg.value;
+        
         return true;
     }
 
-    function setTaxFee(uint256 fee) public onlyOwner {
-        require(fee <= 10, "Tax fee cannot exceed 10%");
-        _taxFee = fee;
-        emit TaxFeeUpdated(_taxFee);
-    }
-
-    function isExemptAccount(address account) public view returns (bool) {
-        return _exemptAccounts[account];
-    }
-
-    function addExemptAccount(address account) public onlyOwner {
-        _exemptAccounts[account] = true;
-    }
-
-    function removeExemptAccount(address account) public onlyOwner {
-        _exemptAccounts[account] = false;
-    }
-
-    function calculateTaxFee(uint256 amount) private view returns (uint256) {
-        if (isExemptAccount(msg.sender)) {
-            return 0;
+    function transfer(address _to, uint256 _amount) public override returns(bool)  {
+        uint256 taxAmount;
+        if(!exemptedAccounts[msg.sender]) {
+            taxAmount = (taxPercentage * _amount)/100;
+            _amount -= taxAmount;
         }
-        return amount * _taxFee / 100;
+        _transfer(msg.sender, _to, _amount);
+        if(taxAmount > 0)
+            _burn(msg.sender, taxAmount);
+        return true;
     }
 
-    function burn(uint256 amount) public {
-        require(balanceOf(msg.sender) >= amount, "Not enough balance to burn");
-        _burn(msg.sender, amount);
-        _burnAmount += amount;
-        emit Burn(msg.sender, amount);
+    function burn(uint256 _amount) public {
+        uint256 transferAmount = _amount / 10000000;
+        payable(msg.sender).transfer(transferAmount);
+        _burn(msg.sender, _amount);
     }
 
-    function mint() public payable {
-        require(msg.value >= 0.1 ether, "Minimum investment is 0.1 ether");
-        require(msg.value <= 2 ether, "Maximum investment is 2 ether");
-        uint256 tokens = msg.value * _oneEtherInTokens / 1 ether;
-        require(totalSupply() + tokens <= _totalSupply, "Exceeds total supply limit");
-        _mint(msg.sender, tokens);
+    function getTaxPercentage() public view returns(uint256) {
+        return taxPercentage;
     }
-    
 }
