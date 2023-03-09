@@ -4,8 +4,11 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract ERC1155Auction is ERC1155Holder {
+    using SafeMath for uint256;
+
     // Variables
     address public owner;
     ERC1155 public nft;
@@ -27,8 +30,6 @@ contract ERC1155Auction is ERC1155Holder {
     ) {
         owner = msg.sender;
         nft = ERC1155(_nft);
-          nft.safeTransferFrom(address(this), highestBidder, 0, 1, "");
-        //auctionCount++;
         auctionStart = _start;
         auctionEnd = _end;
     }
@@ -40,12 +41,6 @@ contract ERC1155Auction is ERC1155Holder {
             "Auction not active"
         );
         require(msg.value > highestBid, "Bid too low");
-
-        // if (highestBid != 0) {
-        //     // Refund the previous highest bidder with a deduction of 1% fees
-        //     uint refundAmount = (bids[highestBidder] * 99) / 100;
-        //    // payable(highestBidder).transfer(refundAmount);
-        // }
 
         highestBid = msg.value;
         highestBidder = msg.sender;
@@ -60,12 +55,12 @@ contract ERC1155Auction is ERC1155Holder {
         require(block.timestamp > auctionEnd, "Auction not ended yet");
 
         if (highestBidder != address(0)) {
-            
-           // Transfer the NFT to the highest bidder
+            // Transfer the NFT to the highest bidder
             nft.safeTransferFrom(address(this), highestBidder, 0, 1, "");
 
             // Transfer the highest bid minus 1% fees to the owner
-            uint256 amountAfterFees = (highestBid * 99) / 100;
+            uint256 fee = highestBid.div(100); // 1% fee
+            uint256 amountAfterFees = highestBid.sub(fee);
             payable(owner).transfer(amountAfterFees);
         }
 
