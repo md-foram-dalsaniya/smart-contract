@@ -2,8 +2,9 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 
-contract NFTAuction {
+contract NFTAuction is ERC721Holder {
     // Variables
     address public owner;
     IERC721 public nft;
@@ -32,7 +33,7 @@ contract NFTAuction {
 
         if (highestBid != 0) {
             // Refund the previous highest bidder
-           // bids[highestBidder] += highestBid;
+            bids[highestBidder] += highestBid;
         }
 
         highestBid = msg.value;
@@ -53,7 +54,7 @@ contract NFTAuction {
             payable(owner).transfer(highestBid);
         }
 
-       // emit AuctionEnded(highestBidder, highestBid);
+        emit AuctionEnded(highestBidder, highestBid);
     }
 
     // Withdraw function
